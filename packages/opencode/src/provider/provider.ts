@@ -950,6 +950,14 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         options,
       }
     }),
+    openmodel: () =>
+      Effect.succeed({
+        autoload: false,
+        async getModel(sdk: any, modelID: string) {
+          return sdk.responses(modelID)
+        },
+        options: { headerTimeout: OPENAI_HEADER_TIMEOUT_DEFAULT },
+      }),
   }
 }
 
@@ -1500,6 +1508,97 @@ const layer = Layer.effect(
             source: "env",
             key: provider.env.length === 1 ? apiKey : undefined,
           })
+        }
+
+        // openmodel auto-detection
+        const openmodelKey = envs["OPENMODEL_API_KEY"]
+        if (openmodelKey) {
+          const baseModel = {
+            providerID: ProviderV2.ID.make("openmodel"),
+            api: { url: "https://api.openmodel.ai", npm: "@ai-sdk/openai-compatible" } as const,
+            capabilities: {
+              temperature: true,
+              reasoning: false,
+              attachment: true,
+              toolcall: true,
+              input: { text: true, audio: false, image: true, video: false, pdf: true },
+              output: { text: true, audio: false, image: false, video: false, pdf: false },
+              interleaved: false,
+            },
+            cost: { cache: { read: 1.25, write: 2.5 } },
+            headers: {},
+            options: {},
+            status: "active" as const,
+            release_date: "",
+            variants: {},
+          }
+          database["openmodel"] = {
+            id: ProviderV2.ID.make("openmodel"),
+            name: "OpenModel",
+            env: ["OPENMODEL_API_KEY"],
+            source: "env",
+            key: openmodelKey,
+            options: {},
+            models: {
+              "gpt-4o": {
+                ...baseModel,
+                id: ModelV2.ID.make("gpt-4o"),
+                api: { id: "gpt-4o", ...baseModel.api },
+                name: "GPT-4o",
+                family: "gpt",
+                cost: { ...baseModel.cost, input: 2.5, output: 10 },
+                limit: { context: 128000, output: 16384 },
+              },
+              "gpt-4o-mini": {
+                ...baseModel,
+                id: ModelV2.ID.make("gpt-4o-mini"),
+                api: { id: "gpt-4o-mini", ...baseModel.api },
+                name: "GPT-4o mini",
+                family: "gpt",
+                cost: { ...baseModel.cost, input: 0.15, output: 0.6 },
+                limit: { context: 128000, output: 16384 },
+              },
+              "qwen3-max": {
+                ...baseModel,
+                id: ModelV2.ID.make("qwen3-max"),
+                api: { id: "qwen3-max", ...baseModel.api },
+                name: "Qwen3 Max",
+                family: "qwen",
+                cost: { ...baseModel.cost, input: 4, output: 16 },
+                limit: { context: 32000, output: 8192 },
+                capabilities: { ...baseModel.capabilities, reasoning: true },
+              },
+              "qwen3-plus": {
+                ...baseModel,
+                id: ModelV2.ID.make("qwen3-plus"),
+                api: { id: "qwen3-plus", ...baseModel.api },
+                name: "Qwen3 Plus",
+                family: "qwen",
+                cost: { ...baseModel.cost, input: 1, output: 4 },
+                limit: { context: 32000, output: 8192 },
+                capabilities: { ...baseModel.capabilities, reasoning: true },
+              },
+              "deepseek-chat": {
+                ...baseModel,
+                id: ModelV2.ID.make("deepseek-chat"),
+                api: { id: "deepseek-chat", ...baseModel.api },
+                name: "DeepSeek V3",
+                family: "deepseek",
+                cost: { ...baseModel.cost, input: 0.27, output: 1.1 },
+                limit: { context: 64000, output: 8192 },
+              },
+              "deepseek-reasoner": {
+                ...baseModel,
+                id: ModelV2.ID.make("deepseek-reasoner"),
+                api: { id: "deepseek-reasoner", ...baseModel.api },
+                name: "DeepSeek R1",
+                family: "deepseek",
+                cost: { ...baseModel.cost, input: 0.55, output: 2.19 },
+                limit: { context: 64000, output: 8192 },
+                capabilities: { ...baseModel.capabilities, reasoning: true, interleaved: { field: "reasoning_content" } },
+              },
+            },
+          }
         }
 
         // load apikeys
