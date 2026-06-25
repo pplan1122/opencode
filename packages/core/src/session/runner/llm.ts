@@ -8,7 +8,7 @@ import {
   isContextOverflowFailure,
   type ProviderErrorEvent,
 } from "@opencode-ai/llm"
-import { Cause, DateTime, Effect, FiberSet, Layer, Option, Semaphore, Stream } from "effect"
+import { Cause, DateTime, Effect, FiberSet, Layer, Option, Schema, Semaphore, Stream } from "effect"
 import { AgentV2 } from "../../agent"
 import { Config } from "../../config"
 import { Database } from "../../database/database"
@@ -29,7 +29,9 @@ import { SessionCompaction } from "../compaction"
 import { SessionEvent } from "../event"
 import { SessionHistory } from "../history"
 import { SessionInput } from "../input"
+import { eq } from "drizzle-orm"
 import { SessionSchema } from "../schema"
+import { SessionTable } from "../sql"
 import { SessionStore } from "../store"
 import { type RunError, Service } from "./index"
 import { SessionRunnerModel } from "./model"
@@ -165,10 +167,32 @@ const layer = Layer.effect(
     const continueAfterOverflowCompaction = (step: number) =>
       new TurnTransitionError({ _tag: "ContinueAfterOverflowCompaction", step })
 
-    const loadSystemContext = (agent: AgentV2.Selection) =>
-      Effect.all([systemContext.load(), skillGuidance.load(agent), referenceGuidance.load()], {
-        concurrency: "unbounded",
-      }).pipe(Effect.map(SystemContext.combine))
+    const loadPluginContext = (sessionID: SessionSchema.ID) =>
+      Effect.gen(function* () {
+        const row = yield* db
+          .select({ metadata: SessionTable.metadata })
+          .from(SessionTable)
+          .where(eq(SessionTable.id, sessionID))
+          .get()
+          .pipe(Effect.orDie)
+        const contexts = row?.metadata?._pluginContext as string[] | undefined
+        if (!contexts?.length) return SystemContext.empty
+        return SystemContext.make({
+          key: SystemContext.Key.make("plugin/session-start"),
+          codec: Schema.toCodecJson(Schema.String),
+          load: Effect.succeed(contexts.join("\n\n")),
+          baseline: (text) => text,
+          update: (_prev, text) => text,
+        })
+      })
+
+    const loadSystemContext = (agent: AgentV2.Selection, sessionID: SessionSchema.ID) =>
+      Effect.all(
+        [systemContext.load(), skillGuidance.load(agent), referenceGuidance.load(), loadPluginContext(sessionID)],
+        {
+          concurrency: "unbounded",
+        },
+      ).pipe(Effect.map(SystemContext.combine))
 
     const runTurnAttempt = Effect.fn("SessionRunner.runTurn")(function* (
       sessionID: SessionSchema.ID,
@@ -180,7 +204,7 @@ const layer = Layer.effect(
       if (session.location.directory !== location.directory || session.location.workspaceID !== location.workspaceID)
         return yield* Effect.interrupt
       const agent = yield* agents.select(session.agent)
-      const initialized = yield* SessionContextEpoch.initialize(db, loadSystemContext(agent), session.id)
+      const initialized = yield* SessionContextEpoch.initialize(db, loadSystemContext(agent, session.id), session.id)
       const toolFibers = yield* FiberSet.make<void, ToolOutputStore.Error>()
       let needsContinuation = false
       let currentStep = step
@@ -195,7 +219,7 @@ const layer = Layer.effect(
         if (promoted > 0) currentStep = 1
       }
       const system =
-        initialized ?? (yield* SessionContextEpoch.prepare(db, events, loadSystemContext(agent), session.id))
+        initialized ?? (yield* SessionContextEpoch.prepare(db, events, loadSystemContext(agent, session.id), session.id))
       const model = yield* models.resolve(session)
       const entries = yield* SessionHistory.entriesForRunner(db, session.id, system.baselineSeq)
       const context = entries.map((entry) => entry.message)
