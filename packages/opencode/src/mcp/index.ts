@@ -285,6 +285,7 @@ const layer = Layer.effect(
 
       const connectTimeout = mcp.timeout ?? DEFAULT_TIMEOUT
       let lastStatus: Status | undefined
+      const transportErrors: string[] = []
 
       for (const { name, transport } of transports) {
         const result = yield* connectTransport(transport, connectTimeout).pipe(
@@ -322,7 +323,8 @@ const layer = Layer.effect(
               }
             }
 
-            lastStatus = { status: "failed" as const, error: lastError.message }
+            transportErrors.push(`${name}: ${lastError.message}`)
+            lastStatus = { status: "failed" as const, error: transportErrors.join("; ") }
             return Effect.void
           }),
         )
