@@ -32,3 +32,14 @@ UPCOMING_CHANGELOG.md
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
+
+# Build-irrelevant files removed from tracking
+specs/
+perf/
+.zed/
+.husky/
+screenshot-uk.png
+install
+.oxlintrc.json
+.gitleaksignore
+artifacts/
