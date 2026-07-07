@@ -1,0 +1,24 @@
+{
+  "name": "@opencode-ai/plugin-mempalace",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    "./server": "./src/server.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "typecheck": "tsgo --noEmit"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": "workspace:*"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "workspace:*",
+    "@tsconfig/node22": "catalog:",
+    "typescript": "catalog:",
+    "@typescript/native-preview": "catalog:"
+  }
+}
