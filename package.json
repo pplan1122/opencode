@@ -102,6 +102,8 @@
     "oxlint": "1.60.0",
     "oxlint-tsgolint": "0.21.0",
     "prettier": "3.6.2",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
     "semver": "^7.6.0",
     "sst": "catalog:",
     "turbo": "2.10.2"

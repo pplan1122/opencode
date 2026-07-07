@@ -5,3 +5,6 @@ bun.lock
 .gitignore
 package-lock.json
 references/
+optimizer-trace.db
+optimizer-trace.db-shm
+optimizer-trace.db-wal

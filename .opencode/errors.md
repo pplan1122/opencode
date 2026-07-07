@@ -3,6 +3,7 @@
 ## 目录
 
 - [2026-06-22] @opentui/core — Bun onResolve 无限递归
+- [2026-07-07] react/jsx-dev-runtime — `--conditions=browser` 下找不到
 
 ---
 
@@ -70,3 +71,35 @@ bunx patch-package @opentui/core
 ```
 
 然后在 `package.json` 中确保 `patchedDependencies` 已包含 `@opentui/core`。
+
+---
+
+## [2026-07-07] react/jsx-dev-runtime — `--conditions=browser` 下找不到
+
+### 现象
+```bash
+bun run dev
+# Error:
+# Cannot find module 'react/jsx-dev-runtime' from '.../packages/tui/src/config/index.tsx'
+```
+
+### 根因
+上游升级后，`dev` 命令使用 `--conditions=browser`（`bun run --cwd packages/opencode --conditions=browser src/index.ts`）。该 flag 激活了某些依赖链中的 JSX dev runtime 解析路径，需要 `react/jsx-dev-runtime` 模块。
+
+但 `react` 只作为 `packages/console-mail` 的间接依赖存在，在 `packages/opencode` 的模块解析中不可达。
+
+### 修复方法
+在根 `package.json` 添加 `react` 和 `react-dom` 作为 devDependencies：
+
+```bash
+bun add -d react react-dom
+```
+
+### 验证
+```bash
+bun run dev
+# TUI 应正常启动，不再报 react/jsx-dev-runtime 错误
+```
+
+### 持久化
+已通过 `devDependencies` 持久化，`bun install` 后始终可用。
